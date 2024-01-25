@@ -42,6 +42,7 @@ public:
 
   // SCOPE: last time slice allocation mask line was changed [ms]
   long int last_time_line_changed_ms;
+  long int timestamp_slice_assign_read_ms;
 
 private:
   bool          find_allocation(uint32_t min_nof_rbg, uint32_t max_nof_rbg, rbgmask_t* rbgmask);

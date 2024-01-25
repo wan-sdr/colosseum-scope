@@ -54,6 +54,7 @@ dl_metric_rr::dl_metric_rr() {
     // initialize variables
     slicing_line_no = 0;
     last_time_line_changed_ms = 0;
+    timestamp_slice_assign_read_ms = 0;
 }
 
 void dl_metric_rr::set_params(const sched_cell_params_t& cell_params_)
@@ -73,6 +74,9 @@ void dl_metric_rr::sched_users(std::map<uint16_t, sched_ue>& ue_db, dl_sf_sched_
 
   // SCOPE: how frequently to update slice allocation mask and scheduling policy
   int line_change_frequency_ms = 250;
+
+  // SCOPE: how frequently to update slice assignment
+  int slice_change_frequency_ms = 250;
 
   // SCOPE: parameter to read forced modulation from file
   int forced_modulation_frequency_ms = 60000;
@@ -135,10 +139,13 @@ void dl_metric_rr::sched_users(std::map<uint16_t, sched_ue>& ue_db, dl_sf_sched_
   auto     iter         = ue_db.begin();
   std::advance(iter, priority_idx);
   for (uint32_t ue_count = 0; ue_count < ue_db.size(); ++iter, ++ue_count) {
+
+//    std::cout << "UE DB Index: " << ue_count << std::endl;
     if (iter == ue_db.end()) {
       iter = ue_db.begin(); // wrap around
     }
     sched_ue* user = &iter->second;
+
 
     // SCOPE: read user IMSI from configuration file and save it into user structure
     if (user->imsi == 0) {
@@ -196,24 +203,39 @@ void dl_metric_rr::sched_users(std::map<uint16_t, sched_ue>& ue_db, dl_sf_sched_
       }
     }
 
+
     // SCOPE: read user slicing ownership from configuration file and save it into user structure
-    if (user->slice_number == -1 && user->imsi > 0) {
-        int ue_slice = -1;  // default
+    if (user->imsi > 0) {
+//            std::cout << "Timestamp diff: " << timestamp_ms - timestamp_slice_assign_read_ms<< std::endl;
+        if (timestamp_slice_assign_read_ms == 0 || (timestamp_ms - timestamp_slice_assign_read_ms
+                                                    >= slice_change_frequency_ms)) {
+            // update timestamp
+            timestamp_slice_assign_read_ms = timestamp_ms;
+//            std::cout << "Timestamp: " << timestamp_slice_assign_read_ms << std::endl;
+            int ue_slice = -1;  // default
+            if (network_slicing_enabled) {
+                // get user slice ownership
+                std::string slice_file_name = "ue_imsi_slice.txt";
+                ue_slice = (int) get_value_from_imsi(user->imsi, slicing_config_dir_path, slice_file_name);
+//                std::cout << "UE slice read from config file: " << ue_slice << std::endl;
+            }
 
-        if (network_slicing_enabled) {
-            // get user slice ownership
-            std::string slice_file_name = "ue_imsi_slice.txt";
-            ue_slice = (int) get_value_from_imsi(user->imsi, slicing_config_dir_path, slice_file_name);
+            // force slice 0 if IMSI was not found in the configuration file
+            if (ue_slice == -1) {
+                ue_slice = 0;
+//                std::cout << "UE IMSI not found in config file, assign to slice: " << ue_slice << std::endl;
+            }
+
+            if (user->slice_number != ue_slice) {
+                std::cout << "UPDATING SLICE ASSIGNMENT..." << std::endl;
+                std::cout << "UE IMSI: " << user->imsi << std::endl;
+                std::cout << "Current UE slice: " << user->slice_number << std::endl;
+                std::cout << "New UE slice: " << ue_slice << std::endl;
+            }
+            // save user RNTI in configuration file
+            user->slice_number = ue_slice;
+            write_user_parameters_on_file(user->get_rnti(), ue_slice);
         }
-
-        // force slice 0 if IMSI was not found in the configuration file
-        if (ue_slice == -1) {
-            ue_slice = 0;
-        }
-
-        // save user RNTI in configuration file
-        user->slice_number = ue_slice;
-        write_user_parameters_on_file(user->get_rnti(), ue_slice);
     }
 
     // SCOPE: save slicing mask in user structure
