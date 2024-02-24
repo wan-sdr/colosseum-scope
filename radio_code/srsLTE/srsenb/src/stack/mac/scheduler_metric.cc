@@ -206,7 +206,7 @@ void dl_metric_rr::sched_users(std::map<uint16_t, sched_ue>& ue_db, dl_sf_sched_
 
     // SCOPE: read user slicing ownership from configuration file and save it into user structure
     if (user->imsi > 0) {
-//            std::cout << "Timestamp diff: " << timestamp_ms - timestamp_slice_assign_read_ms<< std::endl;
+        int ue_array_idx = get_ue_idx_from_rnti(user->get_rnti());
         if (timestamp_slice_assign_read_ms == 0 || (timestamp_ms - timestamp_slice_assign_read_ms
                                                     >= slice_change_frequency_ms)) {
             // update timestamp
@@ -234,6 +234,7 @@ void dl_metric_rr::sched_users(std::map<uint16_t, sched_ue>& ue_db, dl_sf_sched_
             }
             // save user RNTI in configuration file
             user->slice_number = ue_slice;
+            ue_resources[ue_array_idx].slice_id = ue_slice;
             write_user_parameters_on_file(user->get_rnti(), ue_slice);
         }
     }
