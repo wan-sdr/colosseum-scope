@@ -31,6 +31,7 @@
 #include "srslte/phy/channel/channel.h"
 #include "srslte/radio/radio.h"
 
+
 namespace srsenb {
 
 class txrx final : public srslte::thread
@@ -57,6 +58,15 @@ private:
 
   // Main system TTI counter
   uint32_t tti = 0;
+
+  // SCOPE: TX gain control counter
+  uint16_t last_time_gain_ctrl_counter = 0;
+
+  // SCOPE config file pointer
+  FILE* config_file;
+
+  // SCOPE TX gain control string
+  char tx_gain_ctrl_str[100];
 
   uint32_t tx_worker_cnt = 0;
   uint32_t nof_workers   = 0;

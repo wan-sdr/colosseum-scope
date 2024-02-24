@@ -29,6 +29,10 @@
 #include "srsenb/hdr/phy/sf_worker.h"
 #include "srsenb/hdr/phy/txrx.h"
 
+#include "srsenb/hdr/global_variables.h"
+#include <stdio.h>
+#include <sys/file.h>
+
 #define Error(fmt, ...)                                                                                                \
   if (SRSLTE_DEBUG_ENABLED)                                                                                            \
   log_h->error(fmt, ##__VA_ARGS__)
@@ -178,6 +182,10 @@ void txrx::run_thread()
   // Set TTI so that first TX is at tti=0
   tti = TTI_SUB(0, FDD_HARQ_DELAY_UL_MS + 1);
 
+  // SCOPE DL TX gain config filename
+  std::string dl_tx_gain_config_file = SCOPE_CONFIG_DIR;
+  dl_tx_gain_config_file += "slicing/dl_tx_gain_global.txt";
+
   // Main loop
   while (running) {
     tti    = TTI_ADD(tti, 1);
@@ -193,6 +201,41 @@ void txrx::run_thread()
       }
 
       radio_h->rx_now(buffer, sf_len, &rx_time);
+
+      if (last_time_gain_ctrl_counter % 250 == 0) {
+          config_file = fopen(dl_tx_gain_config_file.c_str(), "r");
+
+          if (config_file) {
+
+              // lock file and check flock return value
+              int ret_fl = flock(fileno(config_file), LOCK_EX);
+              if (ret_fl == -1) {
+                fclose(config_file);
+                log_h->info("DL TX gain configuration: flock return value is -1 (%s)!\n",
+                            dl_tx_gain_config_file.c_str());
+                break;
+              }
+
+              if (fgets(tx_gain_ctrl_str, sizeof(tx_gain_ctrl_str), config_file) != NULL) {
+                float gain = strtof(tx_gain_ctrl_str, NULL);
+                log_h->info("DL TX gain configuration: set gain to (%.1f)\n", gain);
+                radio_h->set_tx_gain(gain);
+              }
+              else {
+                log_h->info("DL TX gain configuration: unknown control string (%s)\n", tx_gain_ctrl_str);
+                break;
+              }
+              // remove is too slow and will crash srsRAN, so don't do this!
+              //remove("agent_cmd.bin");  // don't allow srsRAN to reread a command
+          } else {
+              log_h->info("DL TX gain configuration: file not found (%s)!\n", dl_tx_gain_config_file.c_str());
+          }
+          fclose(config_file);
+      }
+
+      last_time_gain_ctrl_counter = (last_time_gain_ctrl_counter + 1) % 1000;
+
+
 
       if (ul_channel) {
         ul_channel->run(buffer.to_cf_t(), buffer.to_cf_t(), sf_len, rx_time);
