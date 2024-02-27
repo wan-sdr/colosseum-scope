@@ -184,7 +184,7 @@ void txrx::run_thread()
 
   // SCOPE DL TX gain config filename
   std::string dl_tx_gain_config_file = SCOPE_CONFIG_DIR;
-  dl_tx_gain_config_file += "slicing/dl_tx_gain_global.txt";
+  dl_tx_gain_config_file += "slicing/tx_gain_dl.txt";
 
   // Main loop
   while (running) {
