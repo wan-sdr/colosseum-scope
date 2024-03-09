@@ -79,7 +79,7 @@ void dl_metric_rr::sched_users(std::map<uint16_t, sched_ue>& ue_db, dl_sf_sched_
   int slice_change_frequency_ms = 250;
 
   // SCOPE: parameter to read forced modulation from file
-  int forced_modulation_frequency_ms = 60000;
+  int forced_modulation_frequency_ms = 250;
 
   tti_alloc = tti_sched;
 
